@@ -2,5 +2,8 @@ package me.hbj233.wguild.data
 
 data class WGuildPositionsGroupData(
         //LIST OF POSITION KEY.
-        val positionsGroup : ArrayList<String>
+        var isDefaultSetting: Boolean = false,
+        var ownerGuild: String,
+        val positionsGroup: LinkedHashMap<String, WGuildPositionData>
+
 )

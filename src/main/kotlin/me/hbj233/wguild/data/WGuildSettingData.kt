@@ -1,15 +1,15 @@
 package me.hbj233.wguild.data
 
 import me.hbj233.wguild.module.WGuildModule
+
 /*import me.hbj233.wguild.utils.changeStaticFinal*/
 
 data class WGuildSettingData(
         var isDefaultSetting: Boolean = false,
-        val guildPositions: String,
-        val guildLevelsSetting : String
+        val guildLevelsSetting: WGuildLevelsGroupData
 ) {
 
-    fun setToDefaultSetting(key : String) {
+    /*fun setToDefaultSetting(key: String) {
         if (isDefaultSetting) {
             /*SimpleCodecEasyConfig::class.java.declaredFields.filter {
                 it.name == "defaultValue"
@@ -24,5 +24,5 @@ data class WGuildSettingData(
                 it.isDefaultSetting = false
             }
         }
-    }
+    }*/
 }

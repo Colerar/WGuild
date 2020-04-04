@@ -3,15 +3,15 @@ package me.hbj233.wguild.module
 import cn.nukkit.Player
 import cn.nukkit.command.CommandSender
 import cn.nukkit.command.data.CommandParameter
-import me.hbj233.wguild.gui.WGuildMainGUI
-import top.wetabq.easyapi.config.encoder.advance.SimpleCodecEasyConfig
 import me.hbj233.wguild.WGuildPlugin
 import me.hbj233.wguild.data.*
+import me.hbj233.wguild.gui.WGuildMainGUI
 import me.hbj233.wguild.utils.getTodayDate
 import top.wetabq.easyapi.api.defaults.*
-import top.wetabq.easyapi.command.EasySubCommand
 import top.wetabq.easyapi.command.EasyCommand
+import top.wetabq.easyapi.command.EasySubCommand
 import top.wetabq.easyapi.config.defaults.SimpleConfigEntry
+import top.wetabq.easyapi.config.encoder.advance.SimpleCodecEasyConfig
 import top.wetabq.easyapi.module.ModuleInfo
 import top.wetabq.easyapi.module.ModuleVersion
 import top.wetabq.easyapi.module.SimpleEasyAPIModule
@@ -27,17 +27,15 @@ object WGuildModule : SimpleEasyAPIModule() {
     const val SIMPLE_CONFIG = "wguildSimpleConfig"
     const val WGUILD_COMMAND = "wguildCommand"
     const val WGUILD_CONFIG_NAME = "wguildConfig"
+    const val WGUILD_PLAYER_CONFIG = "wguildPlayerConfig"
     const val WGUILD_SETTINGS_CONFIG_NAME = "wguildSettingsConfig"
-    const val WGUILD_POSITIONS_CONFIG_NAME = "wguildPositionsConfig"
     const val WGUILD_POSITIONS_GROUPS_CONFIG_NAME = "wguildPositionsGroupsConfig"
-    const val WGUILD_LEVELS_CONFIG_NAME = "wguildLevelsConfig"
-    const val WGUILD_LEVELS_GROUPS_CONFIG_NAME = "wguildLevelsGroupsConfig"
     lateinit var wguildConfig: SimpleCodecEasyConfig<WGuildData>
+    lateinit var wguildPlayerConfig: SimpleCodecEasyConfig<PlayerGuildData>
     lateinit var wguildSettingsConfig: SimpleCodecEasyConfig<WGuildSettingData>
-    lateinit var wguildPositionsConfig: SimpleCodecEasyConfig<WGuildPositionData>
     lateinit var wguildPositionsGroupsConfig: SimpleCodecEasyConfig<WGuildPositionsGroupData>
-    lateinit var wguildLevelsConfig: SimpleCodecEasyConfig<WGuildLevelData>
-    lateinit var wguildLevelsGroupConfig: SimpleCodecEasyConfig<WGuildLevelsGroupData>
+    lateinit var defaultPositionPair: Triple<String, WGuildPositionsGroupData, WGuildPositionData>
+    lateinit var defaultSettingPair: Triple<String, WGuildSettingData, WGuildLevelData>
 
     //CONFIG PATH
     private const val TITLE_PATH = ".title"
@@ -64,66 +62,35 @@ object WGuildModule : SimpleEasyAPIModule() {
             override fun format(message: String): String = message.replace(TITLE_PLACE_HOLDER, title)
         })
 
-        wguildPositionsConfig = object : SimpleCodecEasyConfig<WGuildPositionData>(WGUILD_POSITIONS_CONFIG_NAME, plugin, WGuildPositionData::class.java,
-                WGuildPositionData("&7&l示例权限", isOwner = false, canKick = false,
-                        canInvite = true, canPermitInvite = false, canChangeSetting = false,
-                        canDissolve = false, canManageMoney = false)) {}
-
-        if (wguildPositionsConfig.simpleConfig.isNullOrEmpty()) {
-            wguildPositionsConfig.simpleConfig = linkedMapOf(
-                    "公会长" to WGuildPositionData("&a&l公会长", isOwner = true, canKick = true,
-                            canInvite = true, canPermitInvite = true, canChangeSetting = true,
-                            canDissolve = true, canManageMoney = true),
-                    "长老" to WGuildPositionData("&e&l长老", isOwner = false, canKick = true,
-                            canInvite = true, canPermitInvite = true, canChangeSetting = true,
-                            canDissolve = false, canManageMoney = true),
-                    "成员" to WGuildPositionData("&7&l成员", isOwner = false, canKick = false,
-                            canInvite = true, canPermitInvite = false, canChangeSetting = false,
-                            canDissolve = false, canManageMoney = false)
-            )
-        }
-        wguildPositionsConfig.save()
-
         wguildPositionsGroupsConfig = object : SimpleCodecEasyConfig<WGuildPositionsGroupData>(WGUILD_POSITIONS_GROUPS_CONFIG_NAME, plugin, WGuildPositionsGroupData::class.java,
-                defaultValue = WGuildPositionsGroupData(arrayListOf("公会长", "长老", "成员"))
+                defaultValue = WGuildPositionsGroupData(isDefaultSetting = true, ownerGuild = "SYSTEM", positionsGroup = linkedMapOf(
+                        "公会长" to WGuildPositionData("&a&l公会长", isOwner = true, canKick = true,
+                                canInvite = true, canPermitInvite = true, canChangeSetting = true,
+                                canDisband = true, canManageMoney = true, isDefault = false),
+                        "长老" to WGuildPositionData("&e&l长老", isOwner = false, canKick = true,
+                                canInvite = true, canPermitInvite = true, canChangeSetting = true,
+                                canDisband = false, canManageMoney = true, isDefault = false),
+                        "成员" to WGuildPositionData("&7&l成员", isOwner = false, canKick = false,
+                                canInvite = true, canPermitInvite = false, canChangeSetting = false,
+                                canDisband = false, canManageMoney = false, isDefault = true)
+                ))
         ) {}
 
-        if (wguildPositionsGroupsConfig.simpleConfig.isNullOrEmpty()) {
+        if (!wguildSettingsConfig.simpleConfig.containsKey("默认权限组") || wguildPositionsGroupsConfig.simpleConfig.isNullOrEmpty()) {
             wguildPositionsGroupsConfig.simpleConfig["默认权限组"] = wguildPositionsGroupsConfig.getDefaultValue()
             wguildPositionsGroupsConfig.save()
-        }
-
-        wguildLevelsConfig = object : SimpleCodecEasyConfig<WGuildLevelData>(WGUILD_LEVELS_CONFIG_NAME, plugin, WGuildLevelData::class.java,
-                defaultValue = WGuildLevelData(5, canChangeName = false, canUseColor = false, price = 250)
-        ) {}
-
-        if (wguildLevelsConfig.simpleConfig.isNullOrEmpty()) {
-            wguildLevelsConfig.simpleConfig = linkedMapOf(
-                    "默认等级1" to WGuildLevelData(5, canChangeName = false, canUseColor = false, price = 250),
-                    "默认等级2" to WGuildLevelData(10, canChangeName = false, canUseColor = false, price = 500),
-                    "默认等级3" to WGuildLevelData(15, canChangeName = true, canUseColor = false, price = 1000),
-                    "默认等级4" to WGuildLevelData(20, canChangeName = true, canUseColor = true, price = 2000),
-                    "默认等级5" to WGuildLevelData(25, canChangeName = true, canUseColor = true, price = 4000)
-            )
-            wguildLevelsConfig.save()
-        }
-
-        wguildLevelsGroupConfig = object : SimpleCodecEasyConfig<WGuildLevelsGroupData>(WGUILD_LEVELS_GROUPS_CONFIG_NAME, plugin, WGuildLevelsGroupData::class.java,
-                defaultValue = WGuildLevelsGroupData(linkedMapOf(
-                        "0" to "默认等级1", "1" to "默认等级2", "2" to "默认等级3", "3" to "默认等级4", "4" to "默认等级5")
-                )
-        ) {}
-
-        if (wguildLevelsGroupConfig.simpleConfig.isNullOrEmpty()) {
-            wguildLevelsGroupConfig.simpleConfig["默认等级组"] = wguildLevelsGroupConfig.getDefaultValue()
-            wguildLevelsGroupConfig.save()
         }
 
         wguildSettingsConfig = object : SimpleCodecEasyConfig<WGuildSettingData>(WGUILD_SETTINGS_CONFIG_NAME, plugin, WGuildSettingData::class.java,
                 defaultValue = WGuildSettingData(
                         true,
-                        guildPositions = "默认权限组",
-                        guildLevelsSetting = "默认等级组"
+                        guildLevelsSetting = WGuildLevelsGroupData(linkedMapOf(
+                                "0" to WGuildLevelData(5, canChangePositionSetting = false, canChangeName = false, canUseColor = false, canVisible = false, canPVP = false, price = 250),
+                                "1" to WGuildLevelData(10, canChangePositionSetting = false,canChangeName = false, canUseColor = false, canVisible = true, canPVP = true, price = 500),
+                                "2" to WGuildLevelData(15, canChangePositionSetting = false, canChangeName = true, canUseColor = false, canVisible = true, canPVP = true, price = 1000),
+                                "3" to WGuildLevelData(20, canChangePositionSetting = false, canChangeName = true, canUseColor = true, canVisible = true, canPVP = true, price = 2000),
+                                "4" to WGuildLevelData(25, canChangePositionSetting = true, canChangeName = true, canUseColor = true, canVisible = true, canPVP = true, price = 4000))
+                        )
                 )
         ) {}
 
@@ -132,10 +99,27 @@ object WGuildModule : SimpleEasyAPIModule() {
             wguildSettingsConfig.save()
         }
 
+
         var defaultUsingSettingsKey = "默认"
         wguildSettingsConfig.simpleConfig.forEach {
             if (it.value.isDefaultSetting) {
+                defaultSettingPair = Triple(it.key, it.value, it.value.guildLevelsSetting.levelsGroup.toSortedMap().values.first())
                 defaultUsingSettingsKey = it.key
+            }
+        }
+
+        var defaultUsingPositionKey = "默认权限组"
+        wguildPositionsGroupsConfig.simpleConfig.forEach {
+            if (it.value.isDefaultSetting) {
+                defaultPositionPair = Triple(
+                        it.key,
+                        it.value,
+                        it.value.positionsGroup
+                                .filter { g -> g.value.isDefault }.values
+                                .lastOrNull()
+                                ?: it.value.positionsGroup.values.first()
+                )
+                defaultUsingPositionKey = it.key
             }
         }
 
@@ -150,19 +134,20 @@ object WGuildModule : SimpleEasyAPIModule() {
                         createDate = getTodayDate(),
                         guildActivity = 0.0,
                         isVisible = true,
-                        canChangeUsingSettings = false,
                         guildPlayersData = linkedMapOf(),
                         guildAskJoinPlayersName = arrayListOf(),
                         guildInvitedPlayers = linkedMapOf(),
-                        usingSettings = defaultUsingSettingsKey
+                        usingSettings = defaultUsingSettingsKey,
+                        canPVP = false,
+                        usingPositionSettings = defaultUsingPositionKey
                 )) {}
         wguildConfig.init()
 
+        wguildPlayerConfig = object : SimpleCodecEasyConfig<PlayerGuildData>(WGUILD_PLAYER_CONFIG, plugin, PlayerGuildData::class.java,
+                defaultValue = PlayerGuildData("", linkedMapOf())) {}
+
         this.registerAPI(WGUILD_CONFIG_NAME, ConfigAPI()).add(wguildConfig)
         this.registerAPI(WGUILD_SETTINGS_CONFIG_NAME, ConfigAPI()).add(wguildSettingsConfig)
-        this.registerAPI(WGUILD_LEVELS_CONFIG_NAME, ConfigAPI()).add(wguildLevelsConfig)
-        this.registerAPI(WGUILD_LEVELS_GROUPS_CONFIG_NAME, ConfigAPI()).add(wguildLevelsGroupConfig)
-        this.registerAPI(WGUILD_POSITIONS_CONFIG_NAME, ConfigAPI()).add(wguildPositionsConfig)
         this.registerAPI(WGUILD_POSITIONS_GROUPS_CONFIG_NAME, ConfigAPI()).add(wguildPositionsGroupsConfig)
 
         this.registerAPI(WGUILD_COMMAND, CommandAPI())

@@ -14,7 +14,7 @@ class WGuildPlugin : PluginBase() {
     }
 
     companion object{
-        var title = "&e[&aW&cGuild&e]&r".color()
+        var title = "&l&e[&bW&cGuild&e]&r ".color()
         lateinit var instance : WGuildPlugin
     }
 
