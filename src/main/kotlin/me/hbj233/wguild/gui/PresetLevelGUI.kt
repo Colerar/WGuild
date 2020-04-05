@@ -59,6 +59,7 @@ class ChooseGuildSettingGUI(title: String = "${WGuildPlugin.title}&e设置服务
             WGuildModule.wguildSettingsConfig.simpleConfig.values.firstOrNull { it.isDefaultSetting }?.isDefaultSetting = false
             WGuildModule.wguildSettingsConfig.safeGetData(dataName).isDefaultSetting = true
             WGuildModule.wguildSettingsConfig.save()
+            player.sendMsgWithTitle("&a设置成功")
         } else {
             player.sendMsgWithTitle("&c你选择的配置等级不从 0 开始， 或者等级之间不连续，因此无法设置")
         }
@@ -166,6 +167,7 @@ class SingleLevelGUI(
         levelsData.levelsGroup[level.toString()] = newLevelData
         WGuildModule.wguildSettingsConfig.save()
         hasChanged = true
+        player.showFormWindow(ShowAllLevelGUI(p.dataName, player, "&a&l修改成功，选择下面其中一项继续修改"))
     }
 
     override fun onClosed(player: Player) {

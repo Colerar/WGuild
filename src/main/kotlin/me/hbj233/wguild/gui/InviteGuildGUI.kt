@@ -12,7 +12,7 @@ import top.wetabq.easyapi.utils.color
 
 class InviteGuildGUI(playerData: PlayerGuildData) : ResponsibleFormWindowSimple(
         "${WGuildPlugin.title}&e邀请列表".color(),
-        "&e&l你可以在此看到所有的邀请信息"
+        "&e&l你可以在此看到所有的邀请信息".color()
 ) {
 
     init {
@@ -38,22 +38,24 @@ class ConfirmInviteGuildGUI(targetGuildData: WGuildData, playerData: PlayerGuild
     init {
         setParent(parent)
         if (playerData.playerJoinGuildId == "") {
-            addButton("&a&l同意") { p ->
+            addButton("&a&l同意".color()) { p ->
                 if (playerData.playerJoinGuildId == "") {
                     targetGuildData.guildInvitedPlayers.remove(p.name)
                     playerData.receivedInvite.remove(guildId)
                     targetGuildData.joinPlayer(p.name, guildId)
+                    WGuildModule.wguildPlayerConfig.save()
                 } else {
                     p.sendMsgWithTitle("&c你已经加入了一个公会哦!")
                 }
             }
-            addButton("&c&l拒绝") { p ->
+            addButton("&c&l拒绝".color()) { p ->
                 targetGuildData.guildInvitedPlayers.remove(p.name)
                 playerData.receivedInvite.remove(guildId)
+                WGuildModule.wguildPlayerConfig.save()
             }
-            addButton("&7让我再想想...")
+            addButton("&7让我再想想...".color())
         } else {
-            addButton("&7你已经加入一个公会了, 不能贪心哦!")
+            addButton("&7你已经加入一个公会了, 不能贪心哦!".color())
         }
 
     }

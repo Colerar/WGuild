@@ -3,6 +3,13 @@ package me.hbj233.wguild.module
 import cn.nukkit.Player
 import cn.nukkit.command.CommandSender
 import cn.nukkit.command.data.CommandParameter
+import cn.nukkit.event.EventHandler
+import cn.nukkit.event.EventPriority
+import cn.nukkit.event.Listener
+import cn.nukkit.event.entity.EntityDamageByEntityEvent
+import cn.nukkit.event.entity.EntityDamageEvent
+import cn.nukkit.event.player.PlayerChatEvent
+import cn.nukkit.event.player.PlayerRespawnEvent
 import me.hbj233.wguild.WGuildPlugin
 import me.hbj233.wguild.data.*
 import me.hbj233.wguild.gui.WGuildMainGUI
@@ -15,6 +22,8 @@ import top.wetabq.easyapi.config.encoder.advance.SimpleCodecEasyConfig
 import top.wetabq.easyapi.module.ModuleInfo
 import top.wetabq.easyapi.module.ModuleVersion
 import top.wetabq.easyapi.module.SimpleEasyAPIModule
+import top.wetabq.easyapi.module.defaults.ChatNameTagFormatModule
+import top.wetabq.easyapi.utils.color
 
 object WGuildModule : SimpleEasyAPIModule() {
 
@@ -30,6 +39,8 @@ object WGuildModule : SimpleEasyAPIModule() {
     const val WGUILD_PLAYER_CONFIG = "wguildPlayerConfig"
     const val WGUILD_SETTINGS_CONFIG_NAME = "wguildSettingsConfig"
     const val WGUILD_POSITIONS_GROUPS_CONFIG_NAME = "wguildPositionsGroupsConfig"
+    const val WGUILD_LISTENER = "wguildListener"
+    const val PLACEHOLDER_PLAYER_GUILD = "%wguild_player%"
     lateinit var wguildConfig: SimpleCodecEasyConfig<WGuildData>
     lateinit var wguildPlayerConfig: SimpleCodecEasyConfig<PlayerGuildData>
     lateinit var wguildSettingsConfig: SimpleCodecEasyConfig<WGuildSettingData>
@@ -38,10 +49,14 @@ object WGuildModule : SimpleEasyAPIModule() {
     lateinit var defaultSettingPair: Triple<String, WGuildSettingData, WGuildLevelData>
 
     //CONFIG PATH
-    private const val TITLE_PATH = ".title"
+    private const val PATH_TITLE = "title"
+    private const val PATH_GUILD_CHAT_START_WITH = "guildChatStarWith"
 
     //PLACEHOLDER
-    private const val TITLE_PLACE_HOLDER = "%wguild_title%"
+    const val PLACEHOLDER_TITLE = "%wguild_title%"
+    const val PLACEHOLDER_PLAYER_IS_GUILD_CHAT_MODE = "%wguild_player_guild_chat_mode%"
+    const val PLACEHOLDER_PLAYER_HAS_INVITATION = "%wguild_player_has_invitation%"
+    const val PLACEHOLDER_PLAYER_GUILD_POSITION = "%wguild_player_guild_position%"
 
 
     override fun getModuleInfo(): ModuleInfo = ModuleInfo(
@@ -54,12 +69,21 @@ object WGuildModule : SimpleEasyAPIModule() {
     override fun moduleRegister() {
 
         val simpleConfig = this.registerAPI(SIMPLE_CONFIG, SimpleConfigAPI(plugin))
-                .add(SimpleConfigEntry(TITLE_PATH, title))
+                .add(SimpleConfigEntry(PATH_TITLE, title))
+                .add(SimpleConfigEntry(PATH_GUILD_CHAT_START_WITH, "!"))
 
-        title = simpleConfig.getPathValue(TITLE_PATH) as String? ?: title
+        title = simpleConfig.getPathValue(PATH_TITLE).toString()
+        val guildChatStartWith = simpleConfig.getPathValue(PATH_GUILD_CHAT_START_WITH).toString()
+
+        val easyAPIChatConfig = ChatNameTagFormatModule.getIntegrateAPI(ChatNameTagFormatModule.CHAT_CONFIG) as SimpleConfigAPI
+        val nameTagConfigValue = easyAPIChatConfig.getPathValue(ChatNameTagFormatModule.NAME_TAG_FORMAT_PATH)
+        if (!nameTagConfigValue.toString().contains(PLACEHOLDER_PLAYER_GUILD)) {
+            easyAPIChatConfig.setPathValue(SimpleConfigEntry(ChatNameTagFormatModule.NAME_TAG_FORMAT_PATH, "$PLACEHOLDER_PLAYER_GUILD&r$nameTagConfigValue"))
+        }
+
 
         MessageFormatAPI.registerSimpleFormatter(object : SimpleMessageFormatter {
-            override fun format(message: String): String = message.replace(TITLE_PLACE_HOLDER, title)
+            override fun format(message: String): String = message.replace(PLACEHOLDER_TITLE, title)
         })
 
         wguildPositionsGroupsConfig = object : SimpleCodecEasyConfig<WGuildPositionsGroupData>(WGUILD_POSITIONS_GROUPS_CONFIG_NAME, plugin, WGuildPositionsGroupData::class.java,
@@ -75,11 +99,7 @@ object WGuildModule : SimpleEasyAPIModule() {
                                 canDisband = false, canManageMoney = false, isDefault = true)
                 ))
         ) {}
-
-        if (!wguildSettingsConfig.simpleConfig.containsKey("默认权限组") || wguildPositionsGroupsConfig.simpleConfig.isNullOrEmpty()) {
-            wguildPositionsGroupsConfig.simpleConfig["默认权限组"] = wguildPositionsGroupsConfig.getDefaultValue()
-            wguildPositionsGroupsConfig.save()
-        }
+        wguildPositionsGroupsConfig.init()
 
         wguildSettingsConfig = object : SimpleCodecEasyConfig<WGuildSettingData>(WGUILD_SETTINGS_CONFIG_NAME, plugin, WGuildSettingData::class.java,
                 defaultValue = WGuildSettingData(
@@ -93,6 +113,12 @@ object WGuildModule : SimpleEasyAPIModule() {
                         )
                 )
         ) {}
+        wguildSettingsConfig.init()
+
+        if (!wguildSettingsConfig.simpleConfig.containsKey("默认权限组") || wguildPositionsGroupsConfig.simpleConfig.isNullOrEmpty()) {
+            wguildPositionsGroupsConfig.simpleConfig["默认权限组"] = wguildPositionsGroupsConfig.getDefaultValue()
+            wguildPositionsGroupsConfig.save()
+        }
 
         if (!wguildSettingsConfig.simpleConfig.containsKey("默认") || wguildSettingsConfig.simpleConfig.isEmpty()) {
             wguildSettingsConfig.simpleConfig["默认"] = wguildSettingsConfig.getDefaultValue()
@@ -131,9 +157,10 @@ object WGuildModule : SimpleEasyAPIModule() {
                         guildMaxMember = 5,
                         guildNowMember = 0,
                         guildMoney = 0,
+                        signInAward = 100,
                         createDate = getTodayDate(),
                         guildActivity = 0.0,
-                        isVisible = true,
+                        isVisible = false,
                         guildPlayersData = linkedMapOf(),
                         guildAskJoinPlayersName = arrayListOf(),
                         guildInvitedPlayers = linkedMapOf(),
@@ -144,7 +171,8 @@ object WGuildModule : SimpleEasyAPIModule() {
         wguildConfig.init()
 
         wguildPlayerConfig = object : SimpleCodecEasyConfig<PlayerGuildData>(WGUILD_PLAYER_CONFIG, plugin, PlayerGuildData::class.java,
-                defaultValue = PlayerGuildData("", linkedMapOf())) {}
+                defaultValue = PlayerGuildData("", false, linkedMapOf())) {}
+        wguildPlayerConfig.init()
 
         this.registerAPI(WGUILD_CONFIG_NAME, ConfigAPI()).add(wguildConfig)
         this.registerAPI(WGUILD_SETTINGS_CONFIG_NAME, ConfigAPI()).add(wguildSettingsConfig)
@@ -174,6 +202,85 @@ object WGuildModule : SimpleEasyAPIModule() {
 
                     }
                 })
+
+        this.registerAPI(WGUILD_LISTENER, NukkitListenerAPI(plugin))
+                .add(object : Listener {
+
+                    @EventHandler
+                    fun onPlayerAttack(event: EntityDamageEvent) {
+                        if (event is EntityDamageByEntityEvent) {
+                            val damager = event.damager
+                            val entity = event.entity
+                            if (damager is Player && entity is Player) {
+                                val damagerGuildId = wguildPlayerConfig.safeGetData(damager.name).playerJoinGuildId
+                                val entityGuildId = wguildPlayerConfig.safeGetData(entity.name).playerJoinGuildId
+                                if (damagerGuildId != "" && entityGuildId != "" && damagerGuildId == entityGuildId) {
+                                    if (!wguildConfig.safeGetData(damagerGuildId).canPVP) {
+                                        event.setCancelled()
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    @EventHandler
+                    fun onPlayerChat(event: PlayerChatEvent) {
+                        val player = event.player
+                        val playerData = wguildPlayerConfig.safeGetData(player.name)
+                        if (playerData.playerJoinGuildId != "" && (playerData.isGuildChatMode || event.message.startsWith(guildChatStartWith))) {
+                            val targetGuildData = wguildConfig.safeGetData(playerData.playerJoinGuildId)
+                            targetGuildData.sendGuildMessage(player.nameTag, player.name, event.message, guildChatStartWith)
+                            event.setCancelled()
+                        }
+                    }
+
+                    @EventHandler(priority = EventPriority.LOWEST)
+                    fun onPlayerRespawn(event: PlayerRespawnEvent) {
+                        SimplePluginTaskAPI.delay(10) { _, _ ->
+                            event.player.teleport(event.player.level.spawnLocation.add(0.0, 1.0, 0.0))
+                        }
+                    }
+
+
+                })
+
+        val messageFormatter = { msg: String, player: String ->
+            var final = msg
+            val playerData = wguildPlayerConfig.safeGetData(player)
+            if (playerData.playerJoinGuildId != "") {
+                val targetGuildData = wguildConfig.safeGetData(playerData.playerJoinGuildId)
+                final = final
+                        .replace(PLACEHOLDER_PLAYER_GUILD, "&a[&b${targetGuildData.guildDisplayName}&a]")
+                        .replace(PLACEHOLDER_PLAYER_GUILD_POSITION, "&6[&a${targetGuildData.getPlayerPosition(player).displayName}&6]")
+                        .replace(PLACEHOLDER_PLAYER_IS_GUILD_CHAT_MODE, if (playerData.isGuildChatMode) "&a已启用" else "&c已禁用")
+                        .replace(PLACEHOLDER_PLAYER_HAS_INVITATION, if(playerData.receivedInvite.isEmpty()) "&a有新的邀请" else "&7暂时没有邀请")
+                        .color()
+            } else {
+                final = final
+                        .replace(PLACEHOLDER_PLAYER_GUILD, "")
+                        .replace(PLACEHOLDER_PLAYER_GUILD_POSITION, "")
+                        .replace(PLACEHOLDER_PLAYER_IS_GUILD_CHAT_MODE, "")
+                        .replace(PLACEHOLDER_PLAYER_HAS_INVITATION, "")
+            }
+            final
+        }
+
+        MessageFormatAPI.registerSimplePlayerFormatter { msg, player ->
+            messageFormatter(msg, player.name)
+        }
+
+        MessageFormatAPI.registerFormatter("wguildChatFormatter", PlayerChatEvent::class.java, object : MessageFormatter<PlayerChatEvent> {
+            override fun format(message: String, data: PlayerChatEvent): String = messageFormatter(message, data.player.name)
+        })
+
+        MessageFormatAPI.registerFormatter("wguildNameTagFormatter", String::class.java, object : MessageFormatter<String> {
+            override fun format(message: String, data: String): String {
+                if (getModuleInfo().moduleOwner.server.getPlayer(data) is Player) {
+                    return messageFormatter(message, data)
+                }
+                return message
+            }
+        })
 
     }
 

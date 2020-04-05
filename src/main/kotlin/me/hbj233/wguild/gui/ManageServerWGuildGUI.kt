@@ -14,7 +14,7 @@ object ManageServerWGuildGUI : ResponsibleFormWindowSimple("${WGuildPlugin.title
 
     init {
         this.addButton("设置单个公会") { p ->
-            p.showFormWindow(object : ResponsibleFormWindowSimple("${WGuildPlugin.title}&e设置单个公会", "") {
+            p.showFormWindow(object : ResponsibleFormWindowSimple("${WGuildPlugin.title}&e设置单个公会".color(), "") {
                 init {
                     WGuildModule.wguildConfig.simpleConfig.forEach {
                         addButton(it.key) { player ->
@@ -22,7 +22,7 @@ object ManageServerWGuildGUI : ResponsibleFormWindowSimple("${WGuildPlugin.title
                                     simpleCodecEasyConfig = WGuildModule.wguildConfig,
                                     obj = WGuildModule.wguildConfig.safeGetData(it.key),
                                     key = it.key,
-                                    guiTitle = "${WGuildPlugin.title}&e设置 ${it.key} 公会",
+                                    guiTitle = "${WGuildPlugin.title}&e设置 ${it.key} 公会".color(),
                                     parent = this
                             )
                             configGUI.setTranslateMap()
@@ -41,10 +41,11 @@ object ManageServerWGuildGUI : ResponsibleFormWindowSimple("${WGuildPlugin.title
                                     "usingPositionSettings" to "公会正在使用的职位设置",
                                     "usingSettings" to "公会正使用的配置",
                                     "canPVP" to "公会内部是否可以PVP",
+                                    "signInAward" to "公会签到奖励",
 
                                     "guildLevel" to "公会等级",
                                     "guildMaxMember" to "公会最大人数",
-                                    "guildNowMember" to "%NONE%",
+                                    "guildNowMember" to "公会目前人数",
                                     "guildMoney" to "公会钱包",
                                     "guildActivity" to "公会活跃度",
                                     "createDate" to "%NONE%",
@@ -53,6 +54,10 @@ object ManageServerWGuildGUI : ResponsibleFormWindowSimple("${WGuildPlugin.title
                                     "guildAskJoinPlayersName" to "%NONE%"
                             )
                     )
+                }
+
+                override fun onClosed(player: Player) {
+                    player.showFormWindow(ManageServerWGuildGUI)
                 }
             })
         }

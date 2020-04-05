@@ -33,7 +33,7 @@ class PresetPositionGUI(title: String = "${WGuildPlugin.title}&e成员权限预�
     }
 }
 
-class ChooseGuildPositionGUI(title: String = "${WGuildPlugin.title}&e设置公会职位权限配置", private val guildId: String) : ResponsibleFormWindowCustom(title.color()) {
+class ChooseGuildPositionGUI(title: String = "${WGuildPlugin.title}&e设置公会职位权限配置".color(), private val guildId: String) : ResponsibleFormWindowCustom(title.color()) {
 
     init {
 
@@ -50,6 +50,7 @@ class ChooseGuildPositionGUI(title: String = "${WGuildPlugin.title}&e设置公�
         if (groupData.positionsGroup.values.firstOrNull { it.isOwner } != null && groupData.positionsGroup.values.firstOrNull { it.isDefault } != null) {
             WGuildModule.wguildConfig.safeGetData(guildId).usingPositionSettings = dataName
             WGuildModule.wguildConfig.save()
+            player.sendMsgWithTitle("&a设置成功")
         } else {
             player.sendMsgWithTitle("&c你选择的配置没有包含会长和成员的默认权限，因此无法设置")
         }
@@ -58,7 +59,7 @@ class ChooseGuildPositionGUI(title: String = "${WGuildPlugin.title}&e设置公�
 
 }
 
-class PositionGroupGUI(title: String = "${WGuildPlugin.title}&e设置职位权限", private val guildId: String) : ResponsibleFormWindowCustom(title.color()) {
+class PositionGroupGUI(title: String = "${WGuildPlugin.title}&e设置职位权限".color(), private val guildId: String) : ResponsibleFormWindowCustom(title.color()) {
 
     init {
         addElement(ElementLabel("&e请按照提示进行设置！注意： 您可以选择一个你自己创建的职位权限以修改， 或选择\"新建配置\"同时填写ID，以新建。 \n &c请注意职位权限配置的拥有者，&l当你不是该配置的拥有者时，你只有对该职位权限使用的权限，而没有编辑权限".color()))
@@ -69,23 +70,14 @@ class PositionGroupGUI(title: String = "${WGuildPlugin.title}&e设置职位权�
                     it.add(1, "新建")
                 })
         )
+        addElement(ElementInput("如果是新建，在这里键入ID"))
     }
 
     override fun onClicked(response: FormResponseCustom, player: Player) {
         val dataName = response.getDropdownResponse(1).elementContent
-        player.showFormWindow(ShowAllPositionGUI(dataName, player, guildId))
-
-    }
-
-}
-
-class ShowAllPositionGUI(val dataName: String, player: Player, val guildId: String, extra: String = "") : ResponsibleFormWindowSimple("${WGuildPlugin.title}&e职位权限设置", "&e选择你需要需改的职位\n $extra".color()) {
-
-    init {
-
         when (dataName) {
             "请选择" -> player.showFormWindow(
-                    object : ResponsibleFormWindowSimple(WGuildPlugin.title, "&c&l您未选择,你可以点击继续以重新选择, 或直接退出") {
+                    object : ResponsibleFormWindowSimple(WGuildPlugin.title, "&c&l您未选择,你可以点击继续以重新选择, 或直接退出".color()) {
                         init {
                             addButton("继续") { player ->
                                 player.showFormWindow(PresetPositionGUI(guildId = guildId))
@@ -93,29 +85,43 @@ class ShowAllPositionGUI(val dataName: String, player: Player, val guildId: Stri
                         }
                     }
             )
-
             else -> {
-                val targetPermissionGroupData = WGuildModule.wguildPositionsGroupsConfig.safeGetData(dataName)
+
+                val targetPermissionGroupData = if (dataName == "新建" && response.getInputResponse(2) != "") WGuildModule.wguildPositionsGroupsConfig.safeGetData(response.getInputResponse(2)) else WGuildModule.wguildPositionsGroupsConfig.safeGetData(dataName)
+                if (dataName == "新建") targetPermissionGroupData.ownerGuild = guildId; targetPermissionGroupData.isDefaultSetting = false
                 if (targetPermissionGroupData.ownerGuild == guildId) {
-                    targetPermissionGroupData.positionsGroup.keys.toMutableList()
-                            .also { it.add("新建") }
-                            .forEach { positionId ->
-                                addButton(positionId) { p ->
-                                    p.showFormWindow(SinglePositionGUI(targetPermissionGroupData, positionId, this))
-                                }
-                            }
+                    player.showFormWindow(ShowAllPositionGUI(dataName, guildId))
                 } else {
                     player.showFormWindow(
-                            object : ResponsibleFormWindowSimple(WGuildPlugin.title, "&c&l您无法修改这个职位权限,你可以点击继续以重新选择, 或直接退出") {
+                            object : ResponsibleFormWindowSimple(WGuildPlugin.title, "&c&l您未选择,你可以点击继续以重新选择, 或直接退出".color()) {
                                 init {
                                     addButton("继续") { player ->
                                         player.showFormWindow(PresetPositionGUI(guildId = guildId))
                                     }
                                 }
-                            }
-                    )
+                            })
                 }
             }
+        }
+
+    }
+
+}
+
+class ShowAllPositionGUI(val dataName: String, val guildId: String, extra: String = "") : ResponsibleFormWindowSimple("${WGuildPlugin.title}&e职位权限设置".color(), "&e选择你需要需改的职位\n $extra".color()) {
+
+    init {
+
+        val targetPermissionGroupData = WGuildModule.wguildPositionsGroupsConfig.safeGetData(dataName)
+        if (dataName == "新建") targetPermissionGroupData.ownerGuild = guildId
+        if (targetPermissionGroupData.ownerGuild == guildId) {
+            targetPermissionGroupData.positionsGroup.keys.toMutableList()
+                    .also { it.add("新建") }
+                    .forEach { positionId ->
+                        addButton(positionId) { p ->
+                            p.showFormWindow(SinglePositionGUI(targetPermissionGroupData, positionId, this))
+                        }
+                    }
         }
     }
 
@@ -128,7 +134,7 @@ class ShowAllPositionGUI(val dataName: String, player: Player, val guildId: Stri
 class SinglePositionGUI(
         private val positionGroupsData: WGuildPositionsGroupData,
         id: String,
-        private val p: ShowAllPositionGUI) : ResponsibleFormWindowCustom("${WGuildPlugin.title}&e设置职位权限") {
+        private val p: ShowAllPositionGUI) : ResponsibleFormWindowCustom("${WGuildPlugin.title}&e设置职位权限".color()) {
 
     private var hasChanged = false
 
@@ -173,12 +179,13 @@ class SinglePositionGUI(
         val newPositionData = WGuildPositionData(displayName, isOwner, canKick, canInvite, canPermitInvite, canChangeSetting, canDisband, canManageMoney, isDefault)
         positionGroupsData.positionsGroup[id] = newPositionData
         WGuildModule.wguildPositionsGroupsConfig.save()
+        player.showFormWindow(ShowAllPositionGUI(p.dataName, p.guildId, "&a&l修改成功，选择下面其中一项继续修改"))
         hasChanged = true
     }
 
     override fun onClosed(player: Player) {
         if (hasChanged) {
-            player.showFormWindow(ShowAllPositionGUI(p.dataName, player, p.guildId, "&a&l修改成功，选择下面其中一项继续修改"))
+            player.showFormWindow(ShowAllPositionGUI(p.dataName, p.guildId, "&a&l修改成功，选择下面其中一项继续修改"))
         } else {
             goBack(player)
         }

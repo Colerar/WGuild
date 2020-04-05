@@ -29,7 +29,9 @@ class WGuildMainGUI(player: Player) : ResponsibleFormWindowSimple(
                 }
 
         if (!isJoined) {
-            addButton("查看邀请 ${playerData.takeIf { it.receivedInvite.isNotEmpty() }?.run { "&c&l(有邀请!)" }}".color()) { p -> p.showFormWindow(InviteGuildGUI(playerData)) }
+            if (playerData.receivedInvite.isNotEmpty()) {
+                addButton("查看邀请 ${playerData.takeIf { it.receivedInvite.isNotEmpty() }?.run { "&c&l(有邀请!)" } ?: ""}".color()) { p -> p.showFormWindow(InviteGuildGUI(playerData)) }
+            }
             addButton("创建公会") { p ->
                 run {
                     val newWGuildGUI = object : ResponsibleFormWindowCustom("${WGuildPlugin.title}&e创建公会") {
@@ -52,14 +54,17 @@ class WGuildMainGUI(player: Player) : ResponsibleFormWindowSimple(
                                 }
                             }
                             if (!WGuildModule.wguildConfig.simpleConfig.containsKey(guildId)) {
-                                WGuildModule.wguildConfig.simpleConfig.put(guildId, WGuildModule.wguildConfig.getDefaultValue())?.let { guildData ->
+                                WGuildModule.wguildConfig.simpleConfig[guildId] = WGuildModule.wguildConfig.getDefaultValue()
+                                WGuildModule.wguildConfig.simpleConfig[guildId]?.let { guildData ->
                                     if (guildData.editGuildInfo(
                                                     player = player,
                                                     guildDisplayName = response.getInputResponse(1),
                                                     guildDescription = response.getInputResponse(2),
-                                                    isVisible = if (WGuildModule.defaultSettingPair.third.canVisible) response.getToggleResponse(3) else guildData.isVisible
+                                                    isVisible = if (WGuildModule.defaultSettingPair.third.canVisible) response.getToggleResponse(3) else guildData.isVisible,
+                                                    isFirst = true
                                             )) {
-                                        guildData.joinPlayer(player.name, guildId, guildData.getPositionsGroup().filter { it.value.isOwner }.keys.first())
+                                        guildData.joinPlayer(player.name, guildId, guildData.getPositionsGroup().filter { it.value.isOwner }.keys.first(), false)
+                                        player.sendMsgWithTitle("&a&l公会创建成功。".color())
                                     } else {
                                         WGuildModule.wguildConfig.simpleConfig.remove(guildId)
                                         player.sendMsgWithTitle("&c公会创建失败。".color())

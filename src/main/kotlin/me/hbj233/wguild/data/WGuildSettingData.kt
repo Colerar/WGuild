@@ -1,6 +1,5 @@
 package me.hbj233.wguild.data
 
-import me.hbj233.wguild.module.WGuildModule
 
 /*import me.hbj233.wguild.utils.changeStaticFinal*/
 

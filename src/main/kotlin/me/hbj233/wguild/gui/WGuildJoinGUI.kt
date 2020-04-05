@@ -21,7 +21,7 @@ class WGuildJoinGUI : ResponsibleFormWindowCustom(
     init {
         val targetConfig = WGuildModule.wguildConfig.simpleConfig
         targetConfig.forEach {
-            if (it.value.isVisible) canJoinWGuildMap[it.key] = it.value.guildDisplayName
+            if (it.value.isVisible) canJoinWGuildMap[it.key] = "${it.value.guildDisplayName} &r&e- &a${it.value.guildNowMember}&7/&c${it.value.guildMaxMember}".color()
         }
         addElement(ElementDropdown("请选择一个公会加入:", canJoinWGuildMap.values
                 .toMutableList().also {
@@ -31,12 +31,10 @@ class WGuildJoinGUI : ResponsibleFormWindowCustom(
     }
 
     override fun onClicked(response: FormResponseCustom, player: Player) {
-        val targetElementContent = canJoinWGuildMap[response.getDropdownResponse(0).elementContent]
+        val targetElementContent = canJoinWGuildMap.filter { it.value == response.getDropdownResponse(0).elementContent }.keys.first()
         if (targetElementContent != "请选择") {
-            targetElementContent?.let {
-                val targetWGuildData = WGuildModule.wguildConfig.safeGetData(targetElementContent)
-                player.showFormWindow(WGuildJoinSubGUI(this, targetWGuildData))
-            }
+            val targetWGuildData = WGuildModule.wguildConfig.safeGetData(targetElementContent)
+            player.showFormWindow(WGuildJoinSubGUI(this, targetWGuildData))
         } else {
             player.sendMsgWithTitle("&c操作失败，请选择公会。")
         }
@@ -59,7 +57,11 @@ class WGuildJoinSubGUI(parent: FormWindow, private val targetGuildData: WGuildDa
 
     override fun onClicked(response: FormResponseCustom, player: Player) {
         if (response.getToggleResponse(1)) {
-            targetGuildData.applyJoin(player.name)
+            if (targetGuildData.guildNowMember + 1 <= targetGuildData.guildMaxMember) {
+                targetGuildData.applyJoin(player.name)
+            } else {
+                player.sendMsgWithTitle("&c&l申请的公会已满，无法添加新的成员")
+            }
         }
     }
 
