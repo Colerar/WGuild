@@ -34,7 +34,7 @@ class WGuildMainGUI(player: Player) : ResponsibleFormWindowSimple(
             }
             addButton("创建公会") { p ->
                 run {
-                    val newWGuildGUI = object : ResponsibleFormWindowCustom("${WGuildPlugin.title}&e创建公会") {
+                    val newWGuildGUI = object : ResponsibleFormWindowCustom("${WGuildPlugin.title}&e创建公会".color()) {
 
                         init {
                             parent = this@WGuildMainGUI
@@ -64,10 +64,10 @@ class WGuildMainGUI(player: Player) : ResponsibleFormWindowSimple(
                                                     isFirst = true
                                             )) {
                                         guildData.joinPlayer(player.name, guildId, guildData.getPositionsGroup().filter { it.value.isOwner }.keys.first(), false)
-                                        player.sendMsgWithTitle("&a&l公会创建成功。".color())
+                                        player.sendMsgWithTitle("&a&l公会创建成功。")
                                     } else {
                                         WGuildModule.wguildConfig.simpleConfig.remove(guildId)
-                                        player.sendMsgWithTitle("&c公会创建失败。".color())
+                                        player.sendMsgWithTitle("&c公会创建失败。")
                                     }
                                 }
                                 WGuildModule.wguildConfig.save()

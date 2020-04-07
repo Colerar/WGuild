@@ -155,8 +155,8 @@ data class WGuildData(
             guildAskJoinPlayersName.forEach {
                 WGuildModule.getModuleInfo().moduleOwner.server.getPlayer(it)?.sendMsgWithTitle("&c&l你申请的公会 &b${guildDisplayName} &c&l已经被解散，自动取消申请")
             }
-            guildPlayersData.keys.forEach {
-                kickPlayer(it, false)
+            guildPlayersData.keys.toList().forEach {
+                kickPlayer(it, false, true)
             }
             guildDisplayName = "已被删除"
             guildDescription = "已被删除"
@@ -210,9 +210,9 @@ data class WGuildData(
         }
     }
 
-    fun kickPlayer(playerName: String, notice: Boolean = true) {
+    fun kickPlayer(playerName: String, notice: Boolean = true, isDisband: Boolean = false) {
         if (guildPlayersData.containsKey(playerName)) {
-            if (getPlayerPosition(playerName).isOwner) {
+            if (!getPlayerPosition(playerName).isOwner || isDisband) {
                 val playerData = WGuildModule.wguildPlayerConfig.safeGetData(playerName)
                 playerData.playerJoinGuildId = ""
                 reduceActivity(playerName, "玩家退出了公会", guildPlayersData[playerName]?.contributedActivity ?: 0.0)
@@ -262,7 +262,7 @@ data class WGuildData(
 
     fun addMoney(playerName: String, reason: String, count: Int, reducePlayerMoney: Boolean = true) {
         if (count > 0) {
-            if (reducePlayerMoney) if (EconomyAPI.compatibilityCheck.isCompatible()) if (EconomyAPI.getMoney(playerName)?:0.0 > count) EconomyAPI.reduceMoney(playerName, count.toDouble())
+            if (reducePlayerMoney) if (EconomyAPI.compatibilityCheck.isCompatible()) if (EconomyAPI.getMoney(playerName)?:0.0 >= count) EconomyAPI.reduceMoney(playerName, count.toDouble())
             guildMoney += count
             guildPlayersData[playerName]?.let { it.donatedMoney += count }
             WGuildModule.wguildConfig.save()
@@ -297,4 +297,4 @@ data class WGuildData(
         }
     }
 
-}
+ }

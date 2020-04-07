@@ -89,7 +89,7 @@ class MyWGuildGUI(player: Player) : ResponsibleFormWindowSimple(
                             val amount = response.getInputResponse(1).toInt()
                             if (amount > 0) {
                                 if (EconomyAPI.compatibilityCheck.isCompatible()) {
-                                    if (EconomyAPI.getMoney(player)?:0.0 > amount) {
+                                    if (EconomyAPI.getMoney(player)?:0.0 >= amount) {
                                         targetWGuildData.addMoney(player.name, "捐赠", amount)
                                         player.sendMsgWithTitle("&a&l捐赠成功")
                                     } else {
@@ -287,7 +287,7 @@ class MyWGuildGUI(player: Player) : ResponsibleFormWindowSimple(
                                             val playerData = WGuildModule.wguildPlayerConfig.safeGetData(applicationPlayerName)
                                             addButton("&a&l同意".color()) { p ->
                                                 if (playerData.playerJoinGuildId == "") {
-                                                    targetWGuildData.guildInvitedPlayers.remove(applicationPlayerName)
+                                                    targetWGuildData.guildAskJoinPlayersName.remove(applicationPlayerName)
                                                     targetWGuildData.joinPlayer(applicationPlayerName, targetWGuildId)
                                                 } else {
                                                     p.sendMsgWithTitle("&c该玩家已经存在与另一个公会之中")
@@ -429,7 +429,7 @@ class MyWGuildGUI(player: Player) : ResponsibleFormWindowSimple(
                             addButton("&a&l确认".color()) { p ->
                                 if (playerData.playerJoinGuildId != "") {
                                     targetWGuildData.disbandGuild(p, targetWGuildId)
-                                    p.sendMsgWithTitle("&a成功解散了了公会")
+                                    p.sendMsgWithTitle("&a成功解散了公会")
                                 } else {
                                     p.sendMsgWithTitle("&c你已经解散了这个公会，无法继续解散")
                                 }

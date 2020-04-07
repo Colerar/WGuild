@@ -63,7 +63,7 @@ object ManageServerWGuildGUI : ResponsibleFormWindowSimple("${WGuildPlugin.title
         }
 
         this.addButton("解散单个公会") { p ->
-
+            //p.showFormWindow(object : ResponsibleFormWindowSimple)
         }
 
         this.addButton("设置公会预设") { p ->
