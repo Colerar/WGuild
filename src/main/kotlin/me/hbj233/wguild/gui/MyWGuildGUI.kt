@@ -1,6 +1,6 @@
 package me.hbj233.wguild.gui
 
-import cn.nukkit.Player
+import  cn.nukkit.Player
 import cn.nukkit.form.element.ElementDropdown
 import cn.nukkit.form.element.ElementInput
 import cn.nukkit.form.element.ElementLabel

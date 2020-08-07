@@ -4,12 +4,10 @@ import cn.nukkit.Player
 import cn.nukkit.command.CommandSender
 import cn.nukkit.command.data.CommandParameter
 import cn.nukkit.event.EventHandler
-import cn.nukkit.event.EventPriority
 import cn.nukkit.event.Listener
 import cn.nukkit.event.entity.EntityDamageByEntityEvent
 import cn.nukkit.event.entity.EntityDamageEvent
 import cn.nukkit.event.player.PlayerChatEvent
-import cn.nukkit.event.player.PlayerRespawnEvent
 import me.hbj233.wguild.WGuildPlugin
 import me.hbj233.wguild.data.*
 import me.hbj233.wguild.gui.WGuildMainGUI
@@ -23,7 +21,9 @@ import top.wetabq.easyapi.module.ModuleInfo
 import top.wetabq.easyapi.module.ModuleVersion
 import top.wetabq.easyapi.module.SimpleEasyAPIModule
 import top.wetabq.easyapi.module.defaults.ChatNameTagFormatModule
-import top.wetabq.easyapi.utils.color
+import top.wetabq.easyapi.placeholder.PlaceholderExpansion
+import top.wetabq.easyapi.placeholder.SimplePlaceholder
+import top.wetabq.easyapi.placeholder.getPlaceholderExpression
 
 object WGuildModule : SimpleEasyAPIModule() {
 
@@ -40,23 +40,27 @@ object WGuildModule : SimpleEasyAPIModule() {
     const val WGUILD_SETTINGS_CONFIG_NAME = "wguildSettingsConfig"
     const val WGUILD_POSITIONS_GROUPS_CONFIG_NAME = "wguildPositionsGroupsConfig"
     const val WGUILD_LISTENER = "wguildListener"
-    const val PLACEHOLDER_PLAYER_GUILD = "%wguild_player%"
+
+    lateinit var simpleConfig: SimpleConfigAPI
     lateinit var wguildConfig: SimpleCodecEasyConfig<WGuildData>
     lateinit var wguildPlayerConfig: SimpleCodecEasyConfig<PlayerGuildData>
     lateinit var wguildSettingsConfig: SimpleCodecEasyConfig<WGuildSettingData>
     lateinit var wguildPositionsGroupsConfig: SimpleCodecEasyConfig<WGuildPositionsGroupData>
     lateinit var defaultPositionPair: Triple<String, WGuildPositionsGroupData, WGuildPositionData>
     lateinit var defaultSettingPair: Triple<String, WGuildSettingData, WGuildLevelData>
+    lateinit var wguildPlaceholderExpansion: PlaceholderExpansion
 
     //CONFIG PATH
     private const val PATH_TITLE = "title"
     private const val PATH_GUILD_CHAT_START_WITH = "guildChatStarWith"
 
     //PLACEHOLDER
-    const val PLACEHOLDER_TITLE = "%wguild_title%"
-    const val PLACEHOLDER_PLAYER_IS_GUILD_CHAT_MODE = "%wguild_player_guild_chat_mode%"
-    const val PLACEHOLDER_PLAYER_HAS_INVITATION = "%wguild_player_has_invitation%"
-    const val PLACEHOLDER_PLAYER_GUILD_POSITION = "%wguild_player_guild_position%"
+    const val PLACEHOLDER_IDENTIFIER = "wguild"
+    const val PLACEHOLDER_TITLE = "title"
+    const val PLACEHOLDER_PLAYER_GUILD = "player"
+    const val PLACEHOLDER_PLAYER_IS_GUILD_CHAT_MODE = "player_guild_chat_mode"
+    const val PLACEHOLDER_PLAYER_HAS_INVITATION = "player_has_invitation"
+    const val PLACEHOLDER_PLAYER_GUILD_POSITION = "player_guild_position"
 
 
     override fun getModuleInfo(): ModuleInfo = ModuleInfo(
@@ -66,25 +70,29 @@ object WGuildModule : SimpleEasyAPIModule() {
             ModuleVersion(1, 0, 0)
     )
 
+
+    fun getWGuildTitle(): String = simpleConfig.getPathValue(PATH_TITLE).toString()
+    fun getGuildChatStartWith(): String = simpleConfig.getPathValue(PATH_GUILD_CHAT_START_WITH).toString()
+    fun setGuildChatStartWith(new: String) = simpleConfig.setPathValue(SimpleConfigEntry(PATH_GUILD_CHAT_START_WITH, new))
+
     override fun moduleRegister() {
 
-        val simpleConfig = this.registerAPI(SIMPLE_CONFIG, SimpleConfigAPI(plugin))
+        simpleConfig = this.registerAPI(SIMPLE_CONFIG, SimpleConfigAPI(plugin))
                 .add(SimpleConfigEntry(PATH_TITLE, title))
                 .add(SimpleConfigEntry(PATH_GUILD_CHAT_START_WITH, "!"))
 
-        title = simpleConfig.getPathValue(PATH_TITLE).toString()
-        val guildChatStartWith = simpleConfig.getPathValue(PATH_GUILD_CHAT_START_WITH).toString()
+        title = getWGuildTitle()
+        val guildChatStartWith = getGuildChatStartWith()
 
-        val easyAPIChatConfig = ChatNameTagFormatModule.getIntegrateAPI(ChatNameTagFormatModule.CHAT_CONFIG) as SimpleConfigAPI
-        val nameTagConfigValue = easyAPIChatConfig.getPathValue(ChatNameTagFormatModule.NAME_TAG_FORMAT_PATH)
-        if (!nameTagConfigValue.toString().contains(PLACEHOLDER_PLAYER_GUILD)) {
-            easyAPIChatConfig.setPathValue(SimpleConfigEntry(ChatNameTagFormatModule.NAME_TAG_FORMAT_PATH, "$PLACEHOLDER_PLAYER_GUILD&r$nameTagConfigValue"))
+        val nameTagConfigValue = ChatNameTagFormatModule.getNameTagFormat()
+        if (!nameTagConfigValue.contains(PLACEHOLDER_PLAYER_GUILD.getPlaceholderExpression(PLACEHOLDER_IDENTIFIER))) {
+            ChatNameTagFormatModule.setNameTagFormat("${PLACEHOLDER_PLAYER_GUILD.getPlaceholderExpression(PLACEHOLDER_IDENTIFIER)}&r$nameTagConfigValue")
         }
 
 
-        MessageFormatAPI.registerSimpleFormatter(object : SimpleMessageFormatter {
+        /*MessageFormatAPI.registerSimpleFormatter(object : SimpleMessageFormatter {
             override fun format(message: String): String = message.replace(PLACEHOLDER_TITLE, title)
-        })
+        })*/
 
         wguildPositionsGroupsConfig = object : SimpleCodecEasyConfig<WGuildPositionsGroupData>(WGUILD_POSITIONS_GROUPS_CONFIG_NAME, plugin, WGuildPositionsGroupData::class.java,
                 defaultValue = WGuildPositionsGroupData(isDefaultSetting = true, ownerGuild = "SYSTEM", positionsGroup = linkedMapOf(
@@ -234,17 +242,57 @@ object WGuildModule : SimpleEasyAPIModule() {
                         }
                     }
 
-                    @EventHandler(priority = EventPriority.LOWEST)
+                    /*@EventHandler(priority = EventPriority.LOWEST)
                     fun onPlayerRespawn(event: PlayerRespawnEvent) {
                         SimplePluginTaskAPI.delay(10) { _, _ ->
                             event.player.teleport(event.player.level.spawnLocation.add(0.0, 1.0, 0.0))
                         }
-                    }
+                    }*/
 
 
                 })
 
-        val messageFormatter = { msg: String, player: String ->
+        wguildPlaceholderExpansion = SimplePlaceholder(
+                owner = this,
+                identifier = PLACEHOLDER_IDENTIFIER,
+                onRequestFunc = {player, identifier ->
+                    when (identifier) {
+                        PLACEHOLDER_TITLE -> title
+                    }
+                    if (player is Player) {
+                        val playerData = wguildPlayerConfig.safeGetData(player.name)
+                        if (playerData.playerJoinGuildId != "") {
+                            val targetGuildData = wguildConfig.safeGetData(playerData.playerJoinGuildId)
+                            when (identifier) {
+                                PLACEHOLDER_PLAYER_GUILD -> "&a[&b${targetGuildData.guildDisplayName}&a]"
+                                PLACEHOLDER_PLAYER_GUILD_POSITION -> "&6[&a${targetGuildData.getPlayerPosition(player.name).displayName}&6]"
+                                PLACEHOLDER_PLAYER_IS_GUILD_CHAT_MODE -> if (playerData.isGuildChatMode) "&a已启用" else "&c已禁用"
+                                PLACEHOLDER_PLAYER_HAS_INVITATION -> "&7你已经加入了一个公会"
+                                else -> "&cNON EXIST PLACEHOLDER"
+                            }
+                        } else {
+                            when (identifier) {
+                                PLACEHOLDER_PLAYER_GUILD -> ""
+                                PLACEHOLDER_PLAYER_GUILD_POSITION -> ""
+                                PLACEHOLDER_PLAYER_IS_GUILD_CHAT_MODE -> if (playerData.isGuildChatMode) "&a已启用" else "&c已禁用"
+                                PLACEHOLDER_PLAYER_HAS_INVITATION -> if(playerData.receivedInvite.isEmpty()) "&a有新的邀请" else "&7暂时没有邀请"
+                                else -> "&cNON EXIST PLACEHOLDER"
+                            }
+                        }
+                    } else {
+                        ""
+                    }
+                },
+                placeholderDescription = linkedMapOf(
+                        PLACEHOLDER_TITLE to "用于表示WGuild插件的前缀标题",
+                        PLACEHOLDER_PLAYER_GUILD to "用于表示玩家的公会",
+                        PLACEHOLDER_PLAYER_GUILD_POSITION to "用于表示玩家在公会的",
+                        PLACEHOLDER_PLAYER_IS_GUILD_CHAT_MODE to "用于表示玩家的公会聊天模式",
+                        PLACEHOLDER_PLAYER_HAS_INVITATION to "用于表示玩家是否被邀请"
+                )
+        ).register()
+
+        /*val messageFormatter = { msg: String, player: String ->
             var final = msg
             val playerData = wguildPlayerConfig.safeGetData(player)
             if (playerData.playerJoinGuildId != "") {
@@ -280,7 +328,8 @@ object WGuildModule : SimpleEasyAPIModule() {
                 }
                 return message
             }
-        })
+        })*/
+
 
     }
 
